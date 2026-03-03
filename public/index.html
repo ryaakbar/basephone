@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>BasePhone — Device Specs & Root Explorer</title>
+<meta name="description" content="Full device specs, root compatibility, and compare any smartphone.">
+<meta name="theme-color" content="#02040a">
+<link rel="manifest" href="manifest.json">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Bebas+Neue&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="noise"></div>
+<div class="glow g1"></div>
+<div class="glow g2"></div>
+<div class="grid-bg"></div>
+
+<!-- MARQUEE -->
+<div class="marquee-bar">
+  <div class="marquee-track">
+    BASEPHONE <span class="mdot">◆</span> FULL DEVICE SPECS <span class="mdot">◆</span> ROOT EXPLORER <span class="mdot">◆</span> COMPARE DEVICES <span class="mdot">◆</span> POWERED BY GSMARENA <span class="mdot">◆</span> FREE TO USE <span class="mdot">◆</span> BASEPHONE <span class="mdot">◆</span> FULL DEVICE SPECS <span class="mdot">◆</span> ROOT EXPLORER <span class="mdot">◆</span> COMPARE DEVICES <span class="mdot">◆</span>
+  </div>
+</div>
+
+<!-- NAV -->
+<nav class="navbar" id="navbar">
+  <div class="nav-brand" onclick="goHome()">
+    <div class="brand-icon"><i class="fa-solid fa-mobile-screen-button"></i></div>
+    <span class="brand-txt">Base<span>Phone</span></span>
+  </div>
+  <div class="nav-tabs">
+    <button class="nav-tab active" id="tab-search" onclick="showView('search')"><i class="fa-solid fa-magnifying-glass"></i> Search</button>
+    <button class="nav-tab" id="tab-compare" onclick="showView('compare')"><i class="fa-solid fa-code-compare"></i> Compare</button>
+    <button class="nav-tab" id="tab-bookmarks" onclick="showView('bookmarks')"><i class="fa-solid fa-bookmark"></i> Saved <span class="bookmark-badge" id="bookmarkBadge">0</span></button>
+  </div>
+  <div class="nav-status">
+    <div class="live-dot"></div><span>LIVE</span>
+  </div>
+</nav>
+
+<!-- ===================== SEARCH VIEW ===================== -->
+<div class="view active" id="view-search">
+
+  <!-- HERO -->
+  <header class="hero">
+    <div class="hero-label reveal">◆ DATABASE POWERED BY GSMARENA</div>
+    <h1 class="hero-title reveal d1">Explore Any<br><span class="accent">Device.</span></h1>
+    <p class="hero-sub reveal d2">Full specs · Root compatibility · Compare side by side</p>
+
+    <div class="search-box reveal d3">
+      <div class="search-inner" id="searchInner">
+        <i class="fa-solid fa-magnifying-glass si"></i>
+        <input type="text" id="searchInput" placeholder="Search any phone — Samsung, iPhone, Xiaomi..." autocomplete="off">
+        <button class="search-go" onclick="doSearch()" id="searchGoBtn">
+          <i class="fa-solid fa-arrow-right"></i>
+        </button>
+      </div>
+      <div class="suggestions hidden" id="suggestions"></div>
+    </div>
+
+    <div class="hero-chips reveal d4">
+      <button class="chip" onclick="quickSearch('Samsung Galaxy S24')">Samsung S24</button>
+      <button class="chip" onclick="quickSearch('iPhone 15')">iPhone 15</button>
+      <button class="chip" onclick="quickSearch('Xiaomi 14')">Xiaomi 14</button>
+      <button class="chip" onclick="quickSearch('Pixel 8')">Pixel 8</button>
+      <button class="chip" onclick="quickSearch('OnePlus 12')">OnePlus 12</button>
+    </div>
+  </header>
+
+  <!-- SEARCH RESULTS -->
+  <div class="results-wrap hidden" id="resultsWrap">
+    <div class="results-header">
+      <div class="results-title" id="resultsTitle">Results</div>
+      <button class="btn-ghost sm" onclick="clearResults()"><i class="fa-solid fa-xmark"></i> Clear</button>
+    </div>
+    <div class="device-grid" id="deviceGrid"></div>
+  </div>
+
+  <!-- SKELETON -->
+  <div class="results-wrap hidden" id="skeletonWrap">
+    <div class="device-grid">
+      ${Array(8).fill(`<div class="device-card skeleton"><div class="sk sk-img"></div><div class="sk sk-t"></div><div class="sk sk-s"></div></div>`).join('')}
+    </div>
+  </div>
+
+  <!-- ERROR -->
+  <div class="empty-state hidden" id="searchError">
+    <i class="fa-solid fa-triangle-exclamation"></i>
+    <p id="searchErrorMsg">Something went wrong</p>
+    <button class="btn-primary" onclick="doSearch()">Try Again</button>
+  </div>
+
+</div>
+
+<!-- ===================== DEVICE DETAIL VIEW ===================== -->
+<div class="view" id="view-detail">
+  <div class="detail-wrap">
+
+    <!-- Back -->
+    <button class="back-btn" onclick="goBack()"><i class="fa-solid fa-arrow-left"></i> Back</button>
+
+    <!-- Skeleton -->
+    <div id="detailSkeleton">
+      <div class="detail-hero sk-detail">
+        <div class="sk" style="width:180px;height:240px;border-radius:16px"></div>
+        <div style="flex:1;display:flex;flex-direction:column;gap:12px;padding-top:16px">
+          <div class="sk" style="height:40px;width:70%"></div>
+          <div class="sk" style="height:18px;width:40%"></div>
+          <div class="sk" style="height:18px;width:55%"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Content -->
+    <div id="detailContent" class="hidden">
+
+      <!-- Device Hero -->
+      <div class="detail-hero">
+        <div class="device-img-wrap">
+          <img id="detailImg" src="" alt="" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 150%22%3E%3Crect width=%22100%25%22 height=%22100%25%22 rx=%2210%22 fill=%22%23111827%22/%3E%3Ctext x=%2250%22 y=%2280%22 text-anchor=%22middle%22 fill=%22%23374151%22 font-size=%2230%22%3E📱%3C/text%3E%3C/svg%3E'">
+        </div>
+        <div class="detail-hero-info">
+          <div class="detail-brand" id="detailBrand">—</div>
+          <h2 class="detail-name" id="detailName">—</h2>
+          <div class="detail-desc" id="detailDesc">—</div>
+          <div class="detail-quickstats" id="detailQuickStats"></div>
+          <div class="detail-actions">
+            <button class="btn-primary" id="bookmarkBtn" onclick="toggleBookmark()">
+              <i class="fa-regular fa-bookmark"></i> Save
+            </button>
+            <button class="btn-secondary" onclick="addToCompare()">
+              <i class="fa-solid fa-code-compare"></i> Compare
+            </button>
+            <a class="btn-ghost sm" id="detailGsmLink" href="#" target="_blank" rel="noopener">
+              <i class="fa-solid fa-arrow-up-right-from-square"></i> GSMArena
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <!-- TABS -->
+      <div class="spec-tabs">
+        <button class="spec-tab active" onclick="switchSpecTab('specs')">📋 Full Specs</button>
+        <button class="spec-tab" onclick="switchSpecTab('root')">🔓 Root Info</button>
+        <button class="spec-tab" onclick="switchSpecTab('display')">📱 Display & Design</button>
+        <button class="spec-tab" onclick="switchSpecTab('camera')">📷 Camera</button>
+        <button class="spec-tab" onclick="switchSpecTab('performance')">⚡ Performance</button>
+        <button class="spec-tab" onclick="switchSpecTab('battery')">🔋 Battery</button>
+      </div>
+
+      <!-- SPECS TAB -->
+      <div class="spec-panel active" id="panel-specs">
+        <div id="allSpecsContainer"></div>
+      </div>
+
+      <!-- ROOT TAB -->
+      <div class="spec-panel" id="panel-root">
+        <div id="rootContainer"></div>
+      </div>
+
+      <!-- DISPLAY TAB -->
+      <div class="spec-panel" id="panel-display">
+        <div id="displayContainer"></div>
+      </div>
+
+      <!-- CAMERA TAB -->
+      <div class="spec-panel" id="panel-camera">
+        <div id="cameraContainer"></div>
+      </div>
+
+      <!-- PERFORMANCE TAB -->
+      <div class="spec-panel" id="panel-performance">
+        <div id="performanceContainer"></div>
+      </div>
+
+      <!-- BATTERY TAB -->
+      <div class="spec-panel" id="panel-battery">
+        <div id="batteryContainer"></div>
+      </div>
+
+    </div>
+    <div class="empty-state hidden" id="detailError">
+      <i class="fa-solid fa-triangle-exclamation"></i>
+      <p id="detailErrorMsg">Failed to load device</p>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== COMPARE VIEW ===================== -->
+<div class="view" id="view-compare">
+  <div class="compare-wrap">
+    <div class="page-header">
+      <h2 class="page-title">Compare Devices</h2>
+      <p class="page-sub">Select 2 devices to compare specs side by side</p>
+    </div>
+
+    <div class="compare-slots">
+      <!-- SLOT A -->
+      <div class="compare-slot" id="slotA">
+        <div class="slot-empty" id="slotAEmpty">
+          <i class="fa-solid fa-plus"></i>
+          <span>Add Device A</span>
+          <div class="slot-search-wrap">
+            <input type="text" class="slot-input" id="slotAInput" placeholder="Search phone..." autocomplete="off">
+            <div class="slot-suggestions hidden" id="slotASuggest"></div>
+          </div>
+        </div>
+        <div class="slot-filled hidden" id="slotAFilled">
+          <img id="slotAImg" src="" alt="">
+          <div class="slot-info">
+            <div class="slot-name" id="slotAName">—</div>
+            <div class="slot-desc" id="slotADesc">—</div>
+          </div>
+          <button class="slot-remove" onclick="removeCompare('A')"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+      </div>
+
+      <div class="vs-badge">VS</div>
+
+      <!-- SLOT B -->
+      <div class="compare-slot" id="slotB">
+        <div class="slot-empty" id="slotBEmpty">
+          <i class="fa-solid fa-plus"></i>
+          <span>Add Device B</span>
+          <div class="slot-search-wrap">
+            <input type="text" class="slot-input" id="slotBInput" placeholder="Search phone..." autocomplete="off">
+            <div class="slot-suggestions hidden" id="slotBSuggest"></div>
+          </div>
+        </div>
+        <div class="slot-filled hidden" id="slotBFilled">
+          <img id="slotBImg" src="" alt="">
+          <div class="slot-info">
+            <div class="slot-name" id="slotBName">—</div>
+            <div class="slot-desc" id="slotBDesc">—</div>
+          </div>
+          <button class="slot-remove" onclick="removeCompare('B')"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+      </div>
+    </div>
+
+    <div class="compare-btn-row">
+      <button class="btn-primary lg" id="compareBtn" onclick="runCompare()" disabled>
+        <i class="fa-solid fa-code-compare"></i> Compare Now
+      </button>
+    </div>
+
+    <!-- Compare skeleton -->
+    <div class="hidden" id="compareSkeleton">
+      <div class="compare-table-wrap">
+        ${Array(6).fill(`<div class="sk" style="height:48px;margin-bottom:6px;border-radius:10px"></div>`).join('')}
+      </div>
+    </div>
+
+    <!-- Compare results -->
+    <div class="hidden" id="compareResults">
+      <div class="compare-table" id="compareTable"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== BOOKMARKS VIEW ===================== -->
+<div class="view" id="view-bookmarks">
+  <div class="bookmarks-wrap">
+    <div class="page-header">
+      <h2 class="page-title">Saved Devices</h2>
+      <p class="page-sub" id="bookmarkCount">0 devices saved</p>
+    </div>
+    <div id="bookmarksList"></div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast hidden" id="toast"></div>
+
+<script src="script.js"></script>
+</body>
+</html>
