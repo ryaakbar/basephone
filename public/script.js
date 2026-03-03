@@ -200,6 +200,24 @@ function renderDetail(device, rootInfo) {
     document.getElementById('detailQuickStats').innerHTML =
         chips.map(c => `<div class="qs-chip">${c}</div>`).join('');
 
+    // ---- SPECIAL FEATURES STRIP (in hero) ----
+    const sf = device.specialFeatures || [];
+    const stripEl = document.getElementById('detailSpecialStrip');
+    if (stripEl) {
+        if (sf.length) {
+            // Show top 5 flagship/premium features as chips
+            const top = sf.slice(0, 6);
+            stripEl.innerHTML = top.map(f =>
+                `<div class="sf-strip-chip ${f.tier}" title="${escHtml(f.description)}">
+                    <span>${f.icon}</span><span>${escHtml(f.title)}</span>
+                </div>`
+            ).join('');
+            stripEl.classList.remove('hidden');
+        } else {
+            stripEl.classList.add('hidden');
+        }
+    }
+
     // Bookmark button
     updateBookmarkBtn(device.id);
 
@@ -227,6 +245,9 @@ function renderDetail(device, rootInfo) {
         </div>`;
     }).join('');
     document.getElementById('allSpecsContainer').innerHTML = allSpecsHTML || '<div class="empty-state"><i class="fa-solid fa-circle-info"></i><p>No specs data available</p></div>';
+
+    // ---- SPECIAL FEATURES FULL SECTION ----
+    renderSpecialFeatures(sf, device.name);
 
     // ---- DISPLAY TAB ----
     const displayRows = [
@@ -593,8 +614,300 @@ async function runCompare() {
     }
 }
 
+// ============================================
+// SCORING ENGINE
+// ============================================
+function scoreDevices(a, b) {
+    const fa = a.flat || {}, fb = b.flat || {};
+    const sfA = a.specialFeatures || [], sfB = b.specialFeatures || [];
+
+    // Helper: extract first number from string
+    const num = (str) => parseFloat((str || '').replace(/,/g,'').match(/[\d.]+/)?.[0] || '0');
+
+    // Helper: extract Hz
+    const hz = (str) => {
+        const m = (str || '').match(/(\d+)\s*Hz/i);
+        return m ? parseInt(m[1]) : 0;
+    };
+
+    // Helper: extract MP
+    const mp = (str) => {
+        const m = (str || '').match(/(\d+)\s*MP/i);
+        return m ? parseInt(m[1]) : 0;
+    };
+
+    // Helper: extract charging watts
+    const watts = (str) => {
+        const m = (str || '').match(/(\d+)\s*W/i);
+        return m ? parseInt(m[1]) : 0;
+    };
+
+    // Helper: extract mAh
+    const mah = (str) => {
+        const m = (str || '').match(/(\d{3,5})\s*mAh/i);
+        return m ? parseInt(m[1]) : 0;
+    };
+
+    // Helper: check keyword
+    const hasKw = (str, ...kws) => kws.some(k => (str || '').toLowerCase().includes(k.toLowerCase()));
+
+    // ── CATEGORY SCORES ──────────────────────────────────────
+    // Each returns { scoreA: 0-100, scoreB: 0-100, breakdown: [] }
+
+    function scoreDisplay() {
+        let sA = 50, sB = 50;
+        const notes = [];
+
+        // Refresh rate (weight: 25)
+        const hzA = hz(fa.displayType), hzB = hz(fb.displayType);
+        if (hzA > hzB)      { sA += 15; notes.push(`${hzA}Hz vs ${hzB}Hz`); }
+        else if (hzB > hzA) { sB += 15; notes.push(`${hzB}Hz vs ${hzA}Hz`); }
+
+        // LTPO bonus
+        if (hasKw(fa.displayType,'ltpo') && !hasKw(fb.displayType,'ltpo')) { sA += 10; }
+        if (hasKw(fb.displayType,'ltpo') && !hasKw(fa.displayType,'ltpo')) { sB += 10; }
+
+        // AMOLED bonus
+        if (hasKw(fa.displayType,'amoled','oled') && !hasKw(fb.displayType,'amoled','oled')) { sA += 8; }
+        if (hasKw(fb.displayType,'amoled','oled') && !hasKw(fa.displayType,'amoled','oled')) { sB += 8; }
+
+        // HDR
+        if (hasKw(fa.displayType,'hdr10+','dolby vision') && !hasKw(fb.displayType,'hdr10+','dolby vision')) { sA += 7; }
+        if (hasKw(fb.displayType,'hdr10+','dolby vision') && !hasKw(fa.displayType,'hdr10+','dolby vision')) { sB += 7; }
+
+        // Protection
+        const protScore = (p) => {
+            if (hasKw(p,'victus 2')) return 4;
+            if (hasKw(p,'victus')) return 3;
+            if (hasKw(p,'gorilla glass 7','gorilla glass 6','ceramic shield')) return 3;
+            if (hasKw(p,'gorilla glass 5')) return 2;
+            if (hasKw(p,'gorilla glass')) return 1;
+            return 0;
+        };
+        const pA = protScore(fa.displayProt), pB = protScore(fb.displayProt);
+        if (pA > pB) sA += 5; else if (pB > pA) sB += 5;
+
+        return { scoreA: Math.min(100, sA), scoreB: Math.min(100, sB), notes };
+    }
+
+    function scorePerformance() {
+        let sA = 50, sB = 50;
+        const notes = [];
+
+        // Chipset scoring table
+        const chipRank = (c = '') => {
+            c = c.toLowerCase();
+            if (c.includes('snapdragon 8 elite')) return 100;
+            if (c.includes('snapdragon 8 gen 3')) return 97;
+            if (c.includes('a18')) return 96;
+            if (c.includes('a17')) return 94;
+            if (c.includes('snapdragon 8 gen 2')) return 93;
+            if (c.includes('dimensity 9300')) return 92;
+            if (c.includes('dimensity 9200')) return 89;
+            if (c.includes('a16')) return 88;
+            if (c.includes('snapdragon 8 gen 1')) return 87;
+            if (c.includes('tensor g4')) return 85;
+            if (c.includes('tensor g3')) return 83;
+            if (c.includes('dimensity 9000')) return 82;
+            if (c.includes('snapdragon 7')) return 75;
+            if (c.includes('a15')) return 86;
+            if (c.includes('dimensity 8300')) return 72;
+            if (c.includes('dimensity 8200')) return 70;
+            if (c.includes('snapdragon 6')) return 60;
+            if (c.includes('helio g99')) return 58;
+            if (c.includes('helio g96')) return 54;
+            if (c.includes('snapdragon 4')) return 45;
+            if (c.includes('dimensity 7')) return 65;
+            if (c.includes('helio')) return 45;
+            if (c.includes('unisoc')) return 35;
+            return 50;
+        };
+
+        const rA = chipRank(fa.chipset), rB = chipRank(fb.chipset);
+        const diff = Math.abs(rA - rB);
+        if (rA > rB) { sA += Math.min(30, diff * 0.4); notes.push(`${fa.chipset?.split(' ').slice(0,4).join(' ')} wins`); }
+        else if (rB > rA) { sB += Math.min(30, diff * 0.4); notes.push(`${fb.chipset?.split(' ').slice(0,4).join(' ')} wins`); }
+
+        // UFS storage speed
+        if (hasKw(fa.storage,'ufs 4') && !hasKw(fb.storage,'ufs 4')) { sA += 8; }
+        if (hasKw(fb.storage,'ufs 4') && !hasKw(fa.storage,'ufs 4')) { sB += 8; }
+        else if (hasKw(fa.storage,'ufs 3') && !hasKw(fb.storage,'ufs 4','ufs 3')) { sA += 4; }
+        else if (hasKw(fb.storage,'ufs 3') && !hasKw(fa.storage,'ufs 4','ufs 3')) { sB += 4; }
+
+        // RAM
+        const ramA = num(fa.storage?.match(/(\d+)GB RAM/i)?.[0]), ramB = num(fb.storage?.match(/(\d+)GB RAM/i)?.[0]);
+        if (ramA > ramB) sA += 5; else if (ramB > ramA) sB += 5;
+
+        return { scoreA: Math.min(100, sA), scoreB: Math.min(100, sB), notes };
+    }
+
+    function scoreCamera() {
+        let sA = 50, sB = 50;
+        const notes = [];
+
+        // Main camera MP
+        const mpA = mp(fa.mainCamera), mpB = mp(fb.mainCamera);
+        if (mpA >= 200 && mpB < 200) sA += 12;
+        else if (mpB >= 200 && mpA < 200) sB += 12;
+        else if (mpA >= 100 && mpB < 100) sA += 8;
+        else if (mpB >= 100 && mpA < 100) sB += 8;
+        else if (mpA > mpB + 10) sA += 5;
+        else if (mpB > mpA + 10) sB += 5;
+        if (mpA || mpB) notes.push(`${mpA || '?'}MP vs ${mpB || '?'}MP`);
+
+        // Periscope
+        if (hasKw(fa.mainCamera,'periscope') && !hasKw(fb.mainCamera,'periscope')) { sA += 15; notes.push('Periscope zoom: A only'); }
+        if (hasKw(fb.mainCamera,'periscope') && !hasKw(fa.mainCamera,'periscope')) { sB += 15; notes.push('Periscope zoom: B only'); }
+
+        // OIS
+        if (hasKw(fa.mainFeatures,'ois') && !hasKw(fb.mainFeatures,'ois')) sA += 8;
+        if (hasKw(fb.mainFeatures,'ois') && !hasKw(fa.mainFeatures,'ois')) sB += 8;
+
+        // 8K video
+        if (hasKw(fa.mainVideo,'8k') && !hasKw(fb.mainVideo,'8k')) { sA += 10; }
+        if (hasKw(fb.mainVideo,'8k') && !hasKw(fa.mainVideo,'8k')) { sB += 10; }
+
+        // 4K 60fps vs 4K 30fps
+        if (hasKw(fa.mainVideo,'4k') && !hasKw(fb.mainVideo,'4k')) sA += 5;
+        if (hasKw(fb.mainVideo,'4k') && !hasKw(fa.mainVideo,'4k')) sB += 5;
+
+        // Special features camera count
+        const camSfA = sfA.filter(f => f.category === 'Camera').length;
+        const camSfB = sfB.filter(f => f.category === 'Camera').length;
+        if (camSfA > camSfB) sA += 5; else if (camSfB > camSfA) sB += 5;
+
+        return { scoreA: Math.min(100, sA), scoreB: Math.min(100, sB), notes };
+    }
+
+    function scoreBattery() {
+        let sA = 50, sB = 50;
+        const notes = [];
+
+        // Battery size
+        const mahA = mah(fa.batteryType), mahB = mah(fb.batteryType);
+        if (mahA > mahB + 200) { sA += Math.min(20, (mahA - mahB) / 100); notes.push(`${mahA}mAh vs ${mahB}mAh`); }
+        else if (mahB > mahA + 200) { sB += Math.min(20, (mahB - mahA) / 100); }
+
+        // Charging speed
+        const wA = watts(fa.charging), wB = watts(fb.charging);
+        if (wA > wB + 5) { sA += Math.min(25, (wA - wB) / 5); notes.push(`${wA}W vs ${wB}W`); }
+        else if (wB > wA + 5) { sB += Math.min(25, (wB - wA) / 5); }
+
+        // Wireless charging
+        if (hasKw(fa.charging,'wireless') && !hasKw(fb.charging,'wireless')) { sA += 8; }
+        if (hasKw(fb.charging,'wireless') && !hasKw(fa.charging,'wireless')) { sB += 8; }
+
+        // Reverse wireless
+        if (hasKw(fa.charging,'reverse') && !hasKw(fb.charging,'reverse')) sA += 5;
+        if (hasKw(fb.charging,'reverse') && !hasKw(fa.charging,'reverse')) sB += 5;
+
+        return { scoreA: Math.min(100, sA), scoreB: Math.min(100, sB), notes };
+    }
+
+    function scoreConnectivity() {
+        let sA = 50, sB = 50;
+
+        // WiFi 7 > 6E > 6
+        const wifiScore = (w = '') => {
+            if (w.includes('wi-fi 7') || w.includes('802.11be')) return 3;
+            if (w.includes('6e')) return 2;
+            if (w.includes('wi-fi 6') || w.includes('802.11ax')) return 1;
+            return 0;
+        };
+        const wA = wifiScore(fa.wlan?.toLowerCase()), wB = wifiScore(fb.wlan?.toLowerCase());
+        if (wA > wB) sA += 12; else if (wB > wA) sB += 12;
+
+        // UWB
+        if (hasKw(fa.sensors,'ultra-wideband','uwb') && !hasKw(fb.sensors,'ultra-wideband','uwb')) sA += 8;
+        if (hasKw(fb.sensors,'ultra-wideband','uwb') && !hasKw(fa.sensors,'ultra-wideband','uwb')) sB += 8;
+
+        // 5G
+        if (hasKw(fa.network,'5g') && !hasKw(fb.network,'5g')) sA += 10;
+        if (hasKw(fb.network,'5g') && !hasKw(fa.network,'5g')) sB += 10;
+
+        // USB 3 / Thunderbolt
+        if (hasKw(fa.usb,'3.','thunderbolt','usb4') && !hasKw(fb.usb,'3.','thunderbolt','usb4')) sA += 8;
+        if (hasKw(fb.usb,'3.','thunderbolt','usb4') && !hasKw(fa.usb,'3.','thunderbolt','usb4')) sB += 8;
+
+        // Bluetooth version
+        const btVer = (s = '') => parseFloat(s.match(/[\d.]+/)?.[0] || '0');
+        const btA = btVer(fa.bluetooth), btB = btVer(fb.bluetooth);
+        if (btA > btB) sA += 5; else if (btB > btA) sB += 5;
+
+        return { scoreA: Math.min(100, sA), scoreB: Math.min(100, sB), notes: [] };
+    }
+
+    function scoreFeatures() {
+        let sA = 50, sB = 50;
+
+        // IP rating
+        const ipScore = (specs) => {
+            const t = JSON.stringify(specs).toLowerCase();
+            if (t.includes('ip68')) return 3;
+            if (t.includes('ip67')) return 2;
+            if (t.includes('ip65')) return 1;
+            return 0;
+        };
+        const ipA = ipScore(a), ipB = ipScore(b);
+        if (ipA > ipB) sA += 12; else if (ipB > ipA) sB += 12;
+
+        // Under-display fingerprint
+        if (hasKw(JSON.stringify(a).toLowerCase(),'under-display','in-display') && !hasKw(JSON.stringify(b).toLowerCase(),'under-display','in-display')) sA += 8;
+        if (hasKw(JSON.stringify(b).toLowerCase(),'under-display','in-display') && !hasKw(JSON.stringify(a).toLowerCase(),'under-display','in-display')) sB += 8;
+
+        // Stylus
+        if (hasKw(JSON.stringify(a),'s pen','stylus') && !hasKw(JSON.stringify(b),'s pen','stylus')) sA += 10;
+        if (hasKw(JSON.stringify(b),'s pen','stylus') && !hasKw(JSON.stringify(a),'s pen','stylus')) sB += 10;
+
+        // IR blaster
+        if (hasKw(fa.sensors,'infrared') && !hasKw(fb.sensors,'infrared')) sA += 5;
+        if (hasKw(fb.sensors,'infrared') && !hasKw(fa.sensors,'infrared')) sB += 5;
+
+        // Special features count bonus
+        const sfCountA = sfA.length, sfCountB = sfB.length;
+        const sfDiff = Math.abs(sfCountA - sfCountB);
+        if (sfCountA > sfCountB) sA += Math.min(10, sfDiff * 1.5);
+        else if (sfCountB > sfCountA) sB += Math.min(10, sfDiff * 1.5);
+
+        return { scoreA: Math.min(100, sA), scoreB: Math.min(100, sB), notes: [] };
+    }
+
+    // Run all categories
+    const categories = [
+        { key: 'display',      label: '📺 Display',      ...scoreDisplay()      },
+        { key: 'performance',  label: '⚡ Performance',   ...scorePerformance()  },
+        { key: 'camera',       label: '📷 Camera',        ...scoreCamera()       },
+        { key: 'battery',      label: '🔋 Battery',       ...scoreBattery()      },
+        { key: 'connectivity', label: '📡 Connectivity',  ...scoreConnectivity() },
+        { key: 'features',     label: '✨ Features',      ...scoreFeatures()     },
+    ];
+
+    // Weighted overall score
+    const weights = { display: 0.20, performance: 0.25, camera: 0.25, battery: 0.15, connectivity: 0.10, features: 0.05 };
+    let overallA = 0, overallB = 0;
+    categories.forEach(c => {
+        overallA += c.scoreA * (weights[c.key] || 0.1);
+        overallB += c.scoreB * (weights[c.key] || 0.1);
+    });
+
+    // Normalize to percentage (keep relative gap)
+    const maxScore = Math.max(overallA, overallB, 1);
+    const normA = Math.round((overallA / maxScore) * 100);
+    const normB = Math.round((overallB / maxScore) * 100);
+    // Make sure lower score is relative — floor at 60 for realistic display
+    const floorScore = (s, max) => Math.max(60, Math.round(60 + (s / max) * 40));
+    const finalA = floorScore(overallA, maxScore);
+    const finalB = floorScore(overallB, maxScore);
+
+    return { categories, overallA: finalA, overallB: finalB };
+}
+
 function renderCompareTable(a, b) {
     const fa = a.flat || {}, fb = b.flat || {};
+
+    // ── COMPUTE SCORES ──────────────────────────────────────
+    const { categories, overallA, overallB } = scoreDevices(a, b);
+    const aWins = overallA >= overallB;
 
     const sections = [
         { title: '📋 General', rows: [
@@ -633,17 +946,93 @@ function renderCompareTable(a, b) {
             ['USB',      fa.usb,         fb.usb],
         ]},
         { title: '🔓 Root', rows: [
-            ['Root Status', a.rootInfo?.rootLabel, b.rootInfo?.rootLabel],
-            ['Brand Policy', a.rootInfo?.policy?.note?.slice(0,80)+'…', b.rootInfo?.policy?.note?.slice(0,80)+'…'],
+            ['Root Status',  a.rootInfo?.rootLabel,                          b.rootInfo?.rootLabel],
+            ['Brand Policy', a.rootInfo?.policy?.note?.slice(0,80)+'…',      b.rootInfo?.policy?.note?.slice(0,80)+'…'],
         ]},
     ];
 
+    // ── SCORE BARS (per category) ────────────────────────────
+    const catBarsHTML = categories.map(c => {
+        const aWinscat = c.scoreA >= c.scoreB;
+        const barA = c.scoreA, barB = c.scoreB;
+        return `
+        <div class="ct-catbar-row">
+            <div class="ct-catbar-label">${c.label}</div>
+            <div class="ct-catbar-wrap">
+                <div class="ct-catbar-a ${aWinscat ? 'win' : ''}" style="width:${barA}%">
+                    <span>${barA}</span>
+                </div>
+                <div class="ct-catbar-b ${!aWinscat ? 'win' : ''}" style="width:${barB}%">
+                    <span>${barB}</span>
+                </div>
+            </div>
+        </div>`;
+    }).join('');
+
     let html = `
+    <div class="compare-score-header">
+        <div class="cs-device ${aWins ? 'winner' : ''}">
+            <div class="cs-name">${escHtml(a.name)}</div>
+            <div class="cs-score-wrap">
+                <div class="cs-score-ring ${aWins ? 'winner' : ''}">
+                    <svg viewBox="0 0 80 80">
+                        <circle cx="40" cy="40" r="32" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="6"/>
+                        <circle cx="40" cy="40" r="32" fill="none"
+                            stroke="${aWins ? '#22c55e' : '#3b82f6'}"
+                            stroke-width="6"
+                            stroke-dasharray="${2 * Math.PI * 32}"
+                            stroke-dashoffset="${2 * Math.PI * 32 * (1 - overallA / 100)}"
+                            stroke-linecap="round"
+                            transform="rotate(-90 40 40)"/>
+                    </svg>
+                    <div class="cs-score-num">${overallA}</div>
+                </div>
+            </div>
+            ${aWins ? '<div class="cs-winner-badge">🏆 Winner</div>' : ''}
+        </div>
+
+        <div class="cs-vs">VS</div>
+
+        <div class="cs-device ${!aWins ? 'winner' : ''}">
+            <div class="cs-name">${escHtml(b.name)}</div>
+            <div class="cs-score-wrap">
+                <div class="cs-score-ring ${!aWins ? 'winner' : ''}">
+                    <svg viewBox="0 0 80 80">
+                        <circle cx="40" cy="40" r="32" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="6"/>
+                        <circle cx="40" cy="40" r="32" fill="none"
+                            stroke="${!aWins ? '#22c55e' : '#3b82f6'}"
+                            stroke-width="6"
+                            stroke-dasharray="${2 * Math.PI * 32}"
+                            stroke-dashoffset="${2 * Math.PI * 32 * (1 - overallB / 100)}"
+                            stroke-linecap="round"
+                            transform="rotate(-90 40 40)"/>
+                    </svg>
+                    <div class="cs-score-num">${overallB}</div>
+                </div>
+            </div>
+            ${!aWins ? '<div class="cs-winner-badge">🏆 Winner</div>' : ''}
+        </div>
+    </div>
+
+    <div class="ct-catbars">
+        <div class="ct-catbar-legend">
+            <div class="ct-catbar-leg-a">▌ ${escHtml(a.name.split(' ').slice(0,3).join(' '))}</div>
+            <div class="ct-catbar-leg-b">▌ ${escHtml(b.name.split(' ').slice(0,3).join(' '))}</div>
+        </div>
+        ${catBarsHTML}
+    </div>
+
     <div class="compare-table-wrap">
         <div class="ct-header">
             <div class="ct-label">Specification</div>
-            <div class="ct-device"><div class="ct-dname">${escHtml(a.name)}</div></div>
-            <div class="ct-device"><div class="ct-dname">${escHtml(b.name)}</div></div>
+            <div class="ct-device">
+                <div class="ct-dname">${escHtml(a.name)}</div>
+                <div class="ct-dscore ${aWins ? 'win' : ''}">${overallA}/100</div>
+            </div>
+            <div class="ct-device">
+                <div class="ct-dname">${escHtml(b.name)}</div>
+                <div class="ct-dscore ${!aWins ? 'win' : ''}">${overallB}/100</div>
+            </div>
         </div>`;
 
     sections.forEach(sec => {
@@ -663,6 +1052,8 @@ function renderCompareTable(a, b) {
     html += '</div>';
     document.getElementById('compareTable').innerHTML = html;
     document.getElementById('compareResults').classList.remove('hidden');
+    // Animate score rings
+    setTimeout(() => document.querySelectorAll('.cs-score-ring circle:last-child').forEach(c => c.style.transition = 'stroke-dashoffset 1s ease'), 50);
 }
 
 // ============================================
@@ -704,4 +1095,88 @@ function initReveal() {
         entries.forEach(e => { if(e.isIntersecting){ e.target.classList.add('visible'); obs.unobserve(e.target); }});
     }, { threshold: .1 });
     document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
+}
+
+// ============================================================
+// SPECIAL FEATURES RENDERER
+// ============================================================
+function renderSpecialFeatures(features, deviceName) {
+    const container = document.getElementById('specialFeaturesSection');
+    if (!container) return;
+
+    if (!features || !features.length) {
+        container.innerHTML = `
+            <div class="sf-wrap">
+                <div class="sf-header">
+                    <div class="sf-title">✨ Special Features</div>
+                </div>
+                <div class="sf-empty">No special features detected for this device.</div>
+            </div>`;
+        return;
+    }
+
+    const tierLabel = { flagship: '🏆 Flagship', premium: '⭐ Premium', standard: '✓ Standard' };
+
+    // Group by category for organized display
+    const grouped = {};
+    features.forEach(f => {
+        if (!grouped[f.category]) grouped[f.category] = [];
+        grouped[f.category].push(f);
+    });
+
+    const catOrder = ['Display','Camera','Performance','Battery','Connectivity','Security','AI','Audio','Features','Build'];
+    const catIcons = {
+        Display:'🖥️', Camera:'📷', Performance:'⚡', Battery:'🔋',
+        Connectivity:'📡', Security:'🔒', AI:'🤖', Audio:'🎵',
+        Features:'✨', Build:'⚙️',
+    };
+
+    // Stats line
+    const flagshipCount = features.filter(f => f.tier === 'flagship').length;
+    const premiumCount  = features.filter(f => f.tier === 'premium').length;
+
+    let html = `
+    <div class="sf-wrap">
+        <div class="sf-header">
+            <div class="sf-title">✨ Special Features</div>
+            <div class="sf-count">${features.length} features</div>
+            ${flagshipCount ? `<div class="sf-tier-badge flagship">🏆 ${flagshipCount} Flagship</div>` : ''}
+            ${premiumCount  ? `<div class="sf-tier-badge premium">⭐ ${premiumCount} Premium</div>`  : ''}
+        </div>`;
+
+    // Render by category in logical order
+    const orderedCats = [
+        ...catOrder.filter(c => grouped[c]),
+        ...Object.keys(grouped).filter(c => !catOrder.includes(c))
+    ];
+
+    orderedCats.forEach(cat => {
+        const catFeatures = grouped[cat];
+        if (!catFeatures?.length) return;
+        html += `
+        <div style="margin-bottom:20px">
+            <div style="font-family:var(--fm);font-size:.65rem;color:var(--blue2);text-transform:uppercase;letter-spacing:.12em;margin-bottom:10px">
+                ${catIcons[cat] || '◆'} ${cat}
+            </div>
+            <div class="sf-grid">`;
+
+        catFeatures.forEach(f => {
+            html += `
+            <div class="sf-card ${f.tier}">
+                <div class="sf-card-top">
+                    <span class="sf-icon">${f.icon}</span>
+                    <div class="sf-card-right">
+                        <div class="sf-card-title">${escHtml(f.title)}</div>
+                        <span class="sf-tier-badge ${f.tier}">${tierLabel[f.tier]}</span>
+                    </div>
+                </div>
+                <div class="sf-desc">${escHtml(f.description)}</div>
+            </div>`;
+        });
+
+        html += `</div></div>`;
+    });
+
+    html += `</div>`;
+    container.innerHTML = html;
 }
