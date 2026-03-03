@@ -1,0 +1,10 @@
+{
+  "name": "basephone",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "BasePhone — Device Specs & Root Explorer",
+  "dependencies": {
+    "axios": "^1.6.0",
+    "cheerio": "^1.0.0"
+  }
+}

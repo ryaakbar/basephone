@@ -1,0 +1,19 @@
+{
+  "rewrites": [
+    { "source": "/api/search",  "destination": "/api/search"  },
+    { "source": "/api/device",  "destination": "/api/device"  },
+    { "source": "/api/compare", "destination": "/api/compare" },
+    { "source": "/api/health",  "destination": "/api/health"  },
+    { "source": "/(.*)",        "destination": "/public/$1"   }
+  ],
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        { "key": "Access-Control-Allow-Origin",  "value": "*" },
+        { "key": "Access-Control-Allow-Methods", "value": "GET, OPTIONS" },
+        { "key": "Cache-Control",                "value": "no-store" }
+      ]
+    }
+  ]
+}
