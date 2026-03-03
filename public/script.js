@@ -502,6 +502,7 @@ function initSlotSearch(slot) {
     const sugBox = document.getElementById(`slot${slot}Suggest`);
     if (!input || !sugBox) return;
     let t;
+
     input.addEventListener('input', () => {
         clearTimeout(t);
         const q = input.value.trim();
@@ -513,17 +514,33 @@ function initSlotSearch(slot) {
                 sugBox._items = data.results.slice(0, 5);
                 sugBox.innerHTML = data.results.slice(0, 5).map((d, i) => `
                     <div class="sug-item" onclick="selectSlot('${slot}', ${i})">
-                        <img class="sug-img" src="${d.thumbnail || ''}" onerror="this.style.opacity=.2" alt="">
+                        <img class="sug-img" src="${escHtml(d.thumbnail || '')}" onerror="this.style.opacity=.2" alt="">
                         <div class="sug-info">
                             <div class="sug-name">${escHtml(d.name)}</div>
+                            <div class="sug-desc">${escHtml(d.description || '')}</div>
                         </div>
                     </div>`).join('');
+
+                // On mobile, use fixed positioning relative to input
+                if (window.innerWidth <= 768) {
+                    const rect = input.getBoundingClientRect();
+                    sugBox.style.top = (rect.bottom + 6) + 'px';
+                    sugBox.style.position = 'fixed';
+                } else {
+                    sugBox.style.position = 'absolute';
+                    sugBox.style.top = '';
+                }
+
                 sugBox.classList.remove('hidden');
             } catch(e) {}
         }, 350);
     });
+
+    // Close on outside click
     document.addEventListener('click', (e) => {
-        if (!e.target.closest(`#slot${slot}`)) sugBox.classList.add('hidden');
+        if (!e.target.closest(`#slot${slot}`) && !e.target.closest(`#slot${slot}Suggest`)) {
+            sugBox.classList.add('hidden');
+        }
     });
 }
 
