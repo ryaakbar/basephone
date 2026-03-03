@@ -55,6 +55,8 @@ async function doSearch() {
     showSkeleton(true);
     document.getElementById('resultsWrap').classList.add('hidden');
     document.getElementById('searchError').classList.add('hidden');
+    // Collapse hero to compact mode while showing results
+    document.querySelector('.hero')?.classList.add('hero-compact');
 
     try {
         const data = await apiFetch(`/api/search?q=${encodeURIComponent(q)}`);
@@ -78,6 +80,10 @@ function quickSearch(q) {
 function clearResults() {
     document.getElementById('resultsWrap').classList.add('hidden');
     document.getElementById('searchInput').value = '';
+    document.getElementById('skeletonWrap').classList.add('hidden');
+    document.getElementById('searchError').classList.add('hidden');
+    // Restore hero to full mode
+    document.querySelector('.hero')?.classList.remove('hero-compact');
 }
 
 async function fetchSuggestions(q) {
